@@ -5,7 +5,7 @@ repository = "https://github.com/DmitriySevkovych/python-poetry-template"
 description = "Template for Python projects with the Poetry package manager"
 authors = ["Dmitriy Sevkovych <dmitriy@sevkovych.com>"]
 readme = "README.md"
-packages = [{include = "app"}]
+packages = [{include = "sandbox"}]
 
 [tool.poetry.dependencies]
 python = "^3.12"
@@ -22,7 +22,7 @@ pytest-asyncio = "^0.23.4"
 typing-extensions = "^4.11.0"
 
 [tool.poetry.scripts]
-start = "app.main:start"
+start = "sandbox.main:start"
 
 [build-system]
 requires = ["poetry-core"]
