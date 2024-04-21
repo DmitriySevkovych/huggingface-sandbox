@@ -2,6 +2,9 @@ import logging
 
 from .app_logging.setup import setup_logging
 
+# from .transformers.inference import simple
+from .diffusers import simple
+
 #
 # Logging
 #
@@ -14,8 +17,8 @@ logger = logging.getLogger(__name__)
 def start():
     """Launched with `poetry run start` at project root level"""
     setup_logging()
-    logger.debug("Hi there!")
-    logger.warning("Hi there!")
+    result = simple.test_pipeline("An image of a squirrel in Picasso style")
+    logger.debug(result)
 
 
 if __name__ == "__main__":
