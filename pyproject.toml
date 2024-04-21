@@ -1,8 +1,8 @@
 [tool.poetry]
-name = "python-poetry-template"
+name = "huggingface-sandbox"
 version = "0.1.0"
-repository = "https://github.com/DmitriySevkovych/python-poetry-template"
-description = "Template for Python projects with the Poetry package manager"
+repository = "https://github.com/DmitriySevkovych/huggingface-sandbox"
+description = "Experiments with HuggingFace models (transformers, diffusers, ...)"
 authors = ["Dmitriy Sevkovych <dmitriy@sevkovych.com>"]
 readme = "README.md"
 packages = [{include = "sandbox"}]
@@ -13,6 +13,11 @@ python-dotenv = "^1.0.0"
 torch = "^2.2.2"
 transformers = "^4.39.3"
 datasets = "^2.18.0"
+pillow = "^10.3.0"
+diffusers = "^0.27.2"
+accelerate = "^0.29.3"
+scipy = "^1.13.0"
+safetensors = "^0.4.3"
 
 [tool.poetry.group.dev.dependencies]
 pre-commit = "^3.5.0"
