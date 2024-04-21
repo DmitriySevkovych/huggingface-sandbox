@@ -3,7 +3,8 @@
 __pycache__/
 
 data/
+models/
 
 .env
-*.log
-*.jsonl
+*.log*
+*.jsonl*
