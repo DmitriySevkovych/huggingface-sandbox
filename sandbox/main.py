@@ -16,7 +16,9 @@ logger = logging.getLogger(__name__)
 def diffuser():
     """Launched with `poetry run diffuser` at project root level"""
     setup_logging()
-    result = diffuser_pipeline("An image of a squirrel in Picasso style")
+    # result = diffuser_pipeline("New Mercedes-Benz headquarters building in downtown Stuttgart. The building has the Mercedes-Benz star on its roof and an advertisement banner on its facade.")
+    # result = diffuser_pipeline("An image of a squirrel in Picasso style")
+    result = diffuser_pipeline("An image of a squirrel")
     logger.debug(result)
 
 
