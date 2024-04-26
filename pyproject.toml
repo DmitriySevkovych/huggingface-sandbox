@@ -19,6 +19,7 @@ scipy = "^1.13.0"
 safetensors = "^0.4.3"
 torch = { version = ">=2.2.2+cu118", source = "pytorch" }
 torchvision = { version = ">=0.15.0+cu118", source = "pytorch" }
+peft = "^0.10.0"
 
 [tool.poetry.group.dev.dependencies]
 pre-commit = "^3.5.0"
