@@ -10,7 +10,9 @@
             "request": "launch",
             "module": "sandbox.main",
             "args": [
-                "Astronaut riding a horse"
+                "Astronaut riding a horse",
+                "--folder",
+                "debug"
             ]
         }
     ]

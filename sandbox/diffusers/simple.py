@@ -27,7 +27,7 @@ def _load_pipeline(checkpoint: str) -> DiffusionPipeline:
     return pipeline
 
 
-def test_pipeline(prompt: str):
+def test_pipeline(prompt: str, directory: str):
     # checkpoint = "runwayml/stable-diffusion-v1-5"
     checkpoint = "stabilityai/stable-diffusion-xl-base-1.0"
     n = 4
@@ -53,11 +53,14 @@ def test_pipeline(prompt: str):
     # inference
     images = pipeline(**inputs).images
 
-    # Save and showresults
+    # Save and show results
     make_image_grid(images, 2, 2).show()
-    for i in range(n):
-        images[i].save(
-            os.path.join(CWD, "data", f"diffusers_output_seed-{seeds[i]}.png")
-        )
 
-    return f'Genetrated {n} images for prompt "{prompt}"'
+    output_dir = os.path.join(CWD, "data", "diffusers", directory)
+    os.makedirs(output_dir, exist_ok=True)
+    for i in range(n):
+        images[i].save(os.path.join(output_dir, f"output_seed-{seeds[i]}.png"))
+
+    return (
+        f'Genetrated {n} images for prompt "{prompt}" into the directory {output_dir}'
+    )

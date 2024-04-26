@@ -17,7 +17,14 @@ logger = logging.getLogger(__name__)
 def _get_args(entrypoint: str):
     parser = argparse.ArgumentParser(description=f"Doodling around with {entrypoint}")
     parser.add_argument("prompt", type=str, help="Provide your prompt")
-    # parser.add_argument('--name', dest='name', default=None, help='Name prefix for the generated result file')
+    if entrypoint == "diffusers":
+        parser.add_argument(
+            "-d",
+            "--dir",
+            type=str,
+            default="",
+            help="Name of the output directory for the generated result files",
+        )
     return parser.parse_args()
 
 
@@ -36,7 +43,7 @@ def diffuser():
     """Launched with `poetry run diffuser` at project root level"""
     setup_logging()
     args = _get_args("diffusers")
-    result = diffuser_pipeline(args.prompt)
+    result = diffuser_pipeline(args.prompt, args.dir)
     logger.debug(result)
 
 
@@ -44,7 +51,7 @@ def transformer():
     """Launched with `poetry run transformer` at project root level"""
     setup_logging()
     args = _get_args("transformers")
-    result = transformer_pipeline(args.prompt)
+    result = transformer_pipeline(**args)
     logger.debug(result)
 
 
