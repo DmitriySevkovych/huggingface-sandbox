@@ -8,3 +8,5 @@
 ## Notes
 
 Some [notes on transformers](./docs/transformers.md).
+
+Some [notes on diffusers](./docs/diffusers.md).
