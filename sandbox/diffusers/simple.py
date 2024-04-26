@@ -25,13 +25,14 @@ def test_pipeline(prompt: str):
     image = pipeline(
         prompt,
         generator=_get_generator(seed=seed),
-        #  num_inference_steps=200,
+        num_inference_steps=25,
         #  strength=0.3,
-        #  guidance_scale=10.5,
+        #  guidance_scale=20.5,
     ).images[0]
 
-    image.save(
-        os.path.join(
-            os.getcwd(), "data", f"diffusers_output_{str(precision)}_seed-{seed}.png"
-        )
+    output_path = os.path.join(
+        os.getcwd(), "data", f"diffusers_output_{str(precision)}_seed-{seed}.png"
     )
+
+    image.save(output_path)
+    return f"Genetrated image {output_path}"

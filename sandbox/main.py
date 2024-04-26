@@ -1,3 +1,4 @@
+import argparse
 import logging
 
 from .app_logging.setup import setup_logging
@@ -11,21 +12,39 @@ logger = logging.getLogger(__name__)
 
 
 #
+# CLI interface
+#
+def _get_args(entrypoint: str):
+    parser = argparse.ArgumentParser(description=f"Doodling around with {entrypoint}")
+    parser.add_argument("prompt", type=str, help="Provide your prompt")
+    # parser.add_argument('--name', dest='name', default=None, help='Name prefix for the generated result file')
+    return parser.parse_args()
+
+
+#
+# Some prompt ideas
+#
+# "Astronaut riding a horse"
+# "An image of a squirrel in Picasso style"
+# "New Mercedes-Benz headquarters building in downtown Stuttgart. The building has the Mercedes-Benz star on its roof and an advertisement banner on its facade."
+
+
+#
 # Entry points
 #
 def diffuser():
     """Launched with `poetry run diffuser` at project root level"""
     setup_logging()
-    # result = diffuser_pipeline("New Mercedes-Benz headquarters building in downtown Stuttgart. The building has the Mercedes-Benz star on its roof and an advertisement banner on its facade.")
-    # result = diffuser_pipeline("An image of a squirrel in Picasso style")
-    result = diffuser_pipeline("An image of a squirrel")
+    args = _get_args("diffusers")
+    result = diffuser_pipeline(args.prompt)
     logger.debug(result)
 
 
 def transformer():
     """Launched with `poetry run transformer` at project root level"""
     setup_logging()
-    result = transformer_pipeline("An image of a squirrel in Picasso style")
+    args = _get_args("transformers")
+    result = transformer_pipeline(args.prompt)
     logger.debug(result)
 
 
