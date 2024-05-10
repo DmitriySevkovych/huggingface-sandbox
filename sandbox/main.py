@@ -2,6 +2,7 @@ import argparse
 import logging
 
 from .app_logging.setup import setup_logging
+from .diffusers.lora import test_pipeline as diffuser_lora_pipeline
 from .diffusers.simple import test_pipeline as diffuser_pipeline
 from .transformers.inference.simple import test_pipeline as transformer_pipeline
 
@@ -25,6 +26,13 @@ def _get_args(entrypoint: str):
             default="",
             help="Name of the output directory for the generated result files",
         )
+        parser.add_argument(
+            "-l",
+            "--lora",
+            type=str,
+            default=None,
+            help="Name of the LoRA to apply",
+        )
     return parser.parse_args()
 
 
@@ -43,7 +51,10 @@ def diffuser():
     """Launched with `poetry run diffuser` at project root level"""
     setup_logging()
     args = _get_args("diffusers")
-    result = diffuser_pipeline(args.prompt, args.dir)
+    if args.lora:
+        result = diffuser_lora_pipeline(args.prompt, args.dir, args.lora)
+    else:
+        result = diffuser_pipeline(args.prompt, args.dir)
     logger.debug(result)
 
 
