@@ -5,16 +5,28 @@
     "version": "0.2.0",
     "configurations": [
         {
-            "name": "Python Debugger: Module",
+            "name": "Python Debugger: Inference",
             "type": "debugpy",
             "request": "launch",
             "module": "sandbox.main",
             "args": [
-                "Astronaut riding a horse",
                 "--dir",
                 "debug",
                 "--lora",
-                "toy"
+                "toy",
+                "Astronaut riding a horse",
+            ]
+        },
+        {
+            "name": "Python Debugger: Training",
+            "type": "debugpy",
+            "request": "launch",
+            "module": "sandbox.main",
+            "args": [
+                "--train",
+                "--dir",
+                "debug",
+                "Dummy prompt"
             ]
         }
     ]
