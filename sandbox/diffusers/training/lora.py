@@ -34,7 +34,7 @@ def _create_dataset_with_captions(
         "caption": datasets.Value(dtype="string"),
     })
 
-    data_dir = os.path.join(CWD, "data", "datasets", dataset_name, "train")
+    data_dir = os.path.join(CWD, "data", "datasets", "train")
 
     with open(os.path.join(data_dir, "captions.json")) as file:
         captions = json.load(file)
@@ -54,12 +54,12 @@ def _load_dataset(
     dataset_name: str = "test_dataset", separate_captions_file: str = None
 ):
     dataset = datasets.load_dataset(
-        "imagefolder", data_dir=os.path.join(CWD, "data", "datasets", dataset_name)
+        "imagefolder", data_dir=os.path.join(CWD, "data", "datasets")
     )
 
     if separate_captions_file is not None:
         with open(
-            os.path.join(CWD, "data", "datasets", dataset_name, "captions.json")
+            os.path.join(CWD, "data", "datasets", "captions.json")
         ) as file:
             dataset.add_column("caption", json.load(file).values())
 
@@ -253,7 +253,7 @@ def train_lora(args):
     text_encoder_one.to(accelerator.device, dtype=weight_dtype)
     text_encoder_two.to(accelerator.device, dtype=weight_dtype)
 
-    if HYPERPARAMETERS.enable_npu_flash_attention:
+    if HYPERPARAMETERS.get('enable_npu_flash_attention'):
         if diffusers.utils.import_utils.is_torch_npu_available():
             logger.info("npu flash attention enabled.")
             unet.enable_npu_flash_attention()
@@ -266,8 +266,8 @@ def train_lora(args):
     # now we will add new LoRA weights to the attention layers
     # Set correct lora layers
     unet_lora_config = peft.LoraConfig(
-        r=args.rank,
-        lora_alpha=args.rank,
+        r=HYPERPARAMETERS.get('rank'),
+        lora_alpha=HYPERPARAMETERS.get('rank'),
         init_lora_weights="gaussian",
         target_modules=["to_k", "to_q", "to_v", "to_out.0"],
     )
@@ -275,11 +275,11 @@ def train_lora(args):
     unet.add_adapter(unet_lora_config)
 
     # The text encoder comes from 🤗 transformers, we will also attach adapters to it.
-    if HYPERPARAMETERS.train_text_encoder:
+    if HYPERPARAMETERS.get('train_text_encoder'):
         # ensure that dtype is float32, even if rest of the model that isn't trained is loaded in fp16
         text_lora_config = peft.LoraConfig(
-            r=args.rank,
-            lora_alpha=args.rank,
+            r=HYPERPARAMETERS.get('rank'),
+            lora_alpha=HYPERPARAMETERS.get('rank'),
             init_lora_weights="gaussian",
             target_modules=["q_proj", "k_proj", "v_proj", "out_proj"],
         )
@@ -387,7 +387,7 @@ def train_lora(args):
                     f" not found in the model:  {unexpected_keys}. "
                 )
 
-        if HYPERPARAMETERS.train_text_encoder:
+        if HYPERPARAMETERS.get('train_text_encoder'):
             diffusers.training_utils._set_state_dict_into_text_encoder(
                 lora_state_dict, prefix="text_encoder.", text_encoder=text_encoder_one_
             )
@@ -401,30 +401,30 @@ def train_lora(args):
         # Make sure the trainable params are in float32. This is again needed since the base models
         # are in `weight_dtype`. More details:
         # https://github.com/huggingface/diffusers/pull/6514#discussion_r1449796804
-        if HYPERPARAMETERS.mixed_precision == "fp16":
+        if HYPERPARAMETERS.get('mixed_precision') == "fp16":
             models = [unet_]
-            if args.train_text_encoder:
+            if HYPERPARAMETERS.get('train_text_encoder'):
                 models.extend([text_encoder_one_, text_encoder_two_])
             diffusers.training_utils.cast_training_params(models, dtype=torch.float32)
 
     accelerator.register_save_state_pre_hook(_save_model_hook)
     accelerator.register_load_state_pre_hook(_load_model_hook)
 
-    if HYPERPARAMETERS.gradient_checkpointing:
+    if HYPERPARAMETERS.get('gradient_checkpointing'):
         unet.enable_gradient_checkpointing()
-        if HYPERPARAMETERS.train_text_encoder:
+        if HYPERPARAMETERS.get('train_text_encoder'):
             text_encoder_one.gradient_checkpointing_enable()
             text_encoder_two.gradient_checkpointing_enable()
 
     # Make sure the trainable params are in float32.
-    if HYPERPARAMETERS.mixed_precision == "fp16":
+    if HYPERPARAMETERS.get('mixed_precision') == "fp16":
         models = [unet]
-        if HYPERPARAMETERS.train_text_encoder:
+        if HYPERPARAMETERS.get('train_text_encoder'):
             models.extend([text_encoder_one, text_encoder_two])
         diffusers.training_utils.cast_training_params(models, dtype=torch.float32)
 
     # Use 8-bit Adam for lower memory usage or to fine-tune the model in 16GB GPUs
-    if HYPERPARAMETERS.use_8bit_adam:
+    if HYPERPARAMETERS.get('use_8bit_adam'):
         try:
             import bitsandbytes as bnb
         except ImportError:
@@ -439,7 +439,7 @@ def train_lora(args):
 
     # Optimizer creation
     params_to_optimize = list(filter(lambda p: p.requires_grad, unet.parameters()))
-    if HYPERPARAMETERS.train_text_encoder:
+    if HYPERPARAMETERS.get('train_text_encoder'):
         params_to_optimize = (
             params_to_optimize
             + list(filter(lambda p: p.requires_grad, text_encoder_one.parameters()))
@@ -447,10 +447,10 @@ def train_lora(args):
         )
     optimizer = optimizer_class(
         params_to_optimize,
-        lr=HYPERPARAMETERS.learning_rate,
-        betas=(HYPERPARAMETERS.adam_beta1, HYPERPARAMETERS.adam_beta2),
-        weight_decay=HYPERPARAMETERS.adam_weight_decay,
-        eps=HYPERPARAMETERS.adam_epsilon,
+        lr=HYPERPARAMETERS.get('learning_rate'),
+        betas=(HYPERPARAMETERS.get('adam_beta1'), HYPERPARAMETERS.get('adam_beta2')),
+        weight_decay=HYPERPARAMETERS.get('adam_weight_decay'),
+        eps=HYPERPARAMETERS.get('adam_epsilon'),
     )
 
     # Preprocessing the datasets.
@@ -481,14 +481,18 @@ def train_lora(args):
         return tokens_one, tokens_two
 
     # TODO wtf, why here? it is used in _preprocess_train
+    resolution = HYPERPARAMETERS.get('resolution')
+    center_crop = HYPERPARAMETERS.get('center_crop')
+    random_flip = HYPERPARAMETERS.get('random_flip')
+
     train_resize = torchvision.transforms.Resize(
-        HYPERPARAMETERS.resolution,
+        resolution,
         interpolation=torchvision.transforms.InterpolationMode.BILINEAR,
     )
     train_crop = (
-        torchvision.transforms.CenterCrop(HYPERPARAMETERS.resolution)
-        if HYPERPARAMETERS.center_crop
-        else torchvision.transforms.RandomCrop(HYPERPARAMETERS.resolution)
+        torchvision.transforms.CenterCrop(resolution)
+        if center_crop
+        else torchvision.transforms.RandomCrop(resolution)
     )
     train_flip = torchvision.transforms.RandomHorizontalFlip(p=1.0)
     train_transforms = torchvision.transforms.Compose([
@@ -503,14 +507,13 @@ def train_lora(args):
         original_sizes = []
         all_images = []
         crop_top_lefts = []
-        resolution = HYPERPARAMETERS.resolution
         for image in images:
             original_sizes.append((image.height, image.width))
             image = train_resize(image)
-            if HYPERPARAMETERS.random_flip and random.random() < 0.5:
+            if random_flip and random.random() < 0.5:
                 # flip
                 image = train_flip(image)
-            if HYPERPARAMETERS.center_crop:
+            if center_crop:
                 y1 = max(0, int(round((image.height - resolution) / 2.0)))
                 x1 = max(0, int(round((image.width - resolution) / 2.0)))
                 image = train_crop(image)
@@ -528,7 +531,7 @@ def train_lora(args):
         tokens_one, tokens_two = _tokenize_captions(examples)
         examples["input_ids_one"] = tokens_one
         examples["input_ids_two"] = tokens_two
-        if HYPERPARAMETERS.debug_loss:
+        if HYPERPARAMETERS.get('debug_loss'):
             fnames = [
                 os.path.basename(image.filename)
                 for image in examples[image_column]
@@ -539,11 +542,11 @@ def train_lora(args):
         return examples
 
     with accelerator.main_process_first():
-        if HYPERPARAMETERS.max_train_samples is not None:
+        if HYPERPARAMETERS.get('max_train_samples') is not None:
             dataset["train"] = (
                 dataset["train"]
-                .shuffle(seed=HYPERPARAMETERS.seed)
-                .select(range(HYPERPARAMETERS.max_train_samples))
+                .shuffle(seed=HYPERPARAMETERS.get('seed'))
+                .select(range(HYPERPARAMETERS.get('max_train_samples')))
             )
         # Set the training transforms
         train_dataset = dataset["train"].with_transform(
@@ -578,27 +581,28 @@ def train_lora(args):
         train_dataset,
         shuffle=True,
         collate_fn=_collate_fn,
-        batch_size=HYPERPARAMETERS.train_batch_size,
-        num_workers=HYPERPARAMETERS.dataloader_num_workers,
+        batch_size=HYPERPARAMETERS.get('train_batch_size'),
+        num_workers=HYPERPARAMETERS.get('dataloader_num_workers'),
     )
 
     # Scheduler and math around the number of training steps.
+    gradient_accumulation_steps = HYPERPARAMETERS.get('gradient_accumulation_steps')
     num_update_steps_per_epoch = math.ceil(
-        len(train_dataloader) / HYPERPARAMETERS.gradient_accumulation_steps
+        len(train_dataloader) / gradient_accumulation_steps
     )
-    max_train_steps = HYPERPARAMETERS.num_train_epochs * num_update_steps_per_epoch
+    max_train_steps = HYPERPARAMETERS.get('num_train_epochs') * num_update_steps_per_epoch
 
     lr_scheduler = diffusers.optimization.get_scheduler(
-        HYPERPARAMETERS.lr_scheduler,
+        HYPERPARAMETERS.get('lr_scheduler'),
         optimizer=optimizer,
-        num_warmup_steps=HYPERPARAMETERS.lr_warmup_steps
-        * HYPERPARAMETERS.gradient_accumulation_steps,
+        num_warmup_steps=HYPERPARAMETERS.get('lr_warmup_steps')
+        * gradient_accumulation_steps,
         num_training_steps=max_train_steps
-        * HYPERPARAMETERS.gradient_accumulation_steps,
+        * gradient_accumulation_steps,
     )
 
     # Prepare everything with our `accelerator`.
-    if HYPERPARAMETERS.train_text_encoder:
+    if HYPERPARAMETERS.get('train_text_encoder'):
         (
             unet,
             text_encoder_one,
@@ -621,9 +625,9 @@ def train_lora(args):
 
     # We need to recalculate our total training steps as the size of the training dataloader may have changed.
     num_update_steps_per_epoch = math.ceil(
-        len(train_dataloader) / HYPERPARAMETERS.gradient_accumulation_steps
+        len(train_dataloader) / gradient_accumulation_steps
     )
-    max_train_steps = HYPERPARAMETERS.num_train_epochs * num_update_steps_per_epoch
+    max_train_steps = HYPERPARAMETERS.get('num_train_epochs') * num_update_steps_per_epoch
     # Afterwards we recalculate our number of training epochs
     # TODO clean up this mess with the recalculations
     num_train_epochs = math.ceil(max_train_steps / num_update_steps_per_epoch)
@@ -635,32 +639,33 @@ def train_lora(args):
 
     # Train!
     total_batch_size = (
-        HYPERPARAMETERS.train_batch_size
+        HYPERPARAMETERS.get('train_batch_size')
         * accelerator.num_processes
-        * HYPERPARAMETERS.gradient_accumulation_steps
+        * gradient_accumulation_steps
     )
 
     logger.info("***** Running training *****")
     logger.info(f"  Num examples = {len(train_dataset)}")
     logger.info(f"  Num Epochs = {num_train_epochs}")
     logger.info(
-        f"  Instantaneous batch size per device = {HYPERPARAMETERS.train_batch_size}"
+        f"  Instantaneous batch size per device = {HYPERPARAMETERS.get('train_batch_size')}"
     )
     logger.info(
         "  Total train batch size (w. parallel, distributed & accumulation) ="
         f" {total_batch_size}"
     )
     logger.info(
-        f"  Gradient Accumulation steps = {HYPERPARAMETERS.gradient_accumulation_steps}"
+        f"  Gradient Accumulation steps = {gradient_accumulation_steps}"
     )
     logger.info(f"  Total optimization steps = {max_train_steps}")
     global_step = 0
     first_epoch = 0
 
     # Potentially load in the weights and states from a previous save
-    if HYPERPARAMETERS.resume_from_checkpoint:
-        if HYPERPARAMETERS.resume_from_checkpoint != "latest":
-            path = os.path.basename(HYPERPARAMETERS.resume_from_checkpoint)
+    resume_from_checkpoint = HYPERPARAMETERS.get('resume_from_checkpoint')
+    if resume_from_checkpoint:
+        if resume_from_checkpoint != "latest":
+            path = os.path.basename(resume_from_checkpoint)
         else:
             # Get the most recent checkpoint
             dirs = os.listdir(output_dir)
@@ -670,7 +675,7 @@ def train_lora(args):
 
         if path is None:
             accelerator.print(
-                f"Checkpoint '{HYPERPARAMETERS.resume_from_checkpoint}' does not exist."
+                f"Checkpoint '{resume_from_checkpoint}' does not exist."
                 " Starting a new training run."
             )
             HYPERPARAMETERS.resume_from_checkpoint = None
@@ -696,7 +701,7 @@ def train_lora(args):
 
     for _ in range(first_epoch, num_train_epochs):
         unet.train()
-        if HYPERPARAMETERS.train_text_encoder:
+        if HYPERPARAMETERS.get('train_text_encoder'):
             text_encoder_one.train()
             text_encoder_two.train()
         train_loss = 0.0
@@ -716,9 +721,9 @@ def train_lora(args):
 
                 # Sample noise that we'll add to the latents
                 noise = torch.randn_like(model_input)
-                if HYPERPARAMETERS.noise_offset:
+                if HYPERPARAMETERS.get('noise_offset'):
                     # https://www.crosslabs.org//blog/diffusion-with-offset-noise
-                    noise += HYPERPARAMETERS.noise_offset * torch.randn(
+                    noise += HYPERPARAMETERS.get('noise_offset') * torch.randn(
                         (model_input.shape[0], model_input.shape[1], 1, 1),
                         device=model_input.device,
                     )
@@ -743,8 +748,8 @@ def train_lora(args):
                 def _compute_time_ids(original_size, crops_coords_top_left):
                     # Adapted from pipeline.StableDiffusionXLPipeline._get_add_time_ids
                     target_size = (
-                        HYPERPARAMETERS.resolution,
-                        HYPERPARAMETERS.resolution,
+                        resolution,
+                        resolution,
                     )
                     add_time_ids = list(
                         original_size + crops_coords_top_left + target_size
@@ -781,10 +786,10 @@ def train_lora(args):
                 )[0]
 
                 # Get the target for loss depending on the prediction type
-                if HYPERPARAMETERS.prediction_type is not None:
+                if HYPERPARAMETERS.get('prediction_type') is not None:
                     # set prediction_type of scheduler if defined
                     noise_scheduler.register_to_config(
-                        prediction_type=HYPERPARAMETERS.prediction_type
+                        prediction_type=HYPERPARAMETERS.get('prediction_type')
                     )
 
                 if noise_scheduler.config.prediction_type == "epsilon":
@@ -797,7 +802,7 @@ def train_lora(args):
                         f" {noise_scheduler.config.prediction_type}"
                     )
 
-                if HYPERPARAMETERS.snr_gamma is None:
+                if HYPERPARAMETERS.get('snr_gamma') is None:
                     loss = torch.nn.functional.mse_loss(
                         model_pred.float(), target.float(), reduction="mean"
                     )
@@ -809,7 +814,7 @@ def train_lora(args):
                         noise_scheduler, timesteps
                     )
                     mse_loss_weights = torch.stack(
-                        [snr, HYPERPARAMETERS.snr_gamma * torch.ones_like(timesteps)],
+                        [snr, HYPERPARAMETERS.get('snr_gamma') * torch.ones_like(timesteps)],
                         dim=1,
                     ).min(dim=1)[0]
                     if noise_scheduler.config.prediction_type == "epsilon":
@@ -825,22 +830,22 @@ def train_lora(args):
                         * mse_loss_weights
                     )
                     loss = loss.mean()
-                if HYPERPARAMETERS.debug_loss and "filenames" in batch:
+                if HYPERPARAMETERS.get('debug_loss') and "filenames" in batch:
                     for fname in batch["filenames"]:
                         accelerator.log({"loss_for_" + fname: loss}, step=global_step)
                 # Gather the losses across all processes for logging (if we use distributed training).
                 avg_loss = accelerator.gather(
-                    loss.repeat(HYPERPARAMETERS.train_batch_size)
+                    loss.repeat(HYPERPARAMETERS.get('train_batch_size'))
                 ).mean()
                 train_loss += (
-                    avg_loss.item() / HYPERPARAMETERS.gradient_accumulation_steps
+                    avg_loss.item() / gradient_accumulation_steps
                 )
 
                 # Backpropagate
                 accelerator.backward(loss)
                 if accelerator.sync_gradients:
                     accelerator.clip_grad_norm_(
-                        params_to_optimize, HYPERPARAMETERS.max_grad_norm
+                        params_to_optimize, HYPERPARAMETERS.get('max_grad_norm')
                     )
                 optimizer.step()
                 lr_scheduler.step()
@@ -858,9 +863,9 @@ def train_lora(args):
                     accelerator.distributed_type == acc.utils.DistributedType.DEEPSPEED
                     or accelerator.is_main_process
                 ):
-                    if global_step % HYPERPARAMETERS.checkpointing_steps == 0:
+                    if global_step % HYPERPARAMETERS.get('checkpointing_steps') == 0:
                         # _before_ saving state, check if this save would set us over the `checkpoints_total_limit`
-                        if HYPERPARAMETERS.checkpoints_total_limit is not None:
+                        if HYPERPARAMETERS.get('checkpoints_total_limit') is not None:
                             checkpoints = os.listdir(output_dir)
                             checkpoints = [
                                 d for d in checkpoints if d.startswith("checkpoint")
@@ -872,11 +877,11 @@ def train_lora(args):
                             # before we save the new checkpoint, we need to have at _most_ `checkpoints_total_limit - 1` checkpoints
                             if (
                                 len(checkpoints)
-                                >= HYPERPARAMETERS.checkpoints_total_limit
+                                >= HYPERPARAMETERS.get('checkpoints_total_limit')
                             ):
                                 num_to_remove = (
                                     len(checkpoints)
-                                    - HYPERPARAMETERS.checkpoints_total_limit
+                                    - HYPERPARAMETERS.get('checkpoints_total_limit')
                                     + 1
                                 )
                                 removing_checkpoints = checkpoints[0:num_to_remove]
@@ -919,7 +924,7 @@ def train_lora(args):
             peft.utils.get_peft_model_state_dict(unet)
         )
 
-        if HYPERPARAMETERS.train_text_encoder:
+        if HYPERPARAMETERS.get('train_text_encoder'):
             text_encoder_one = _unwrap_model(text_encoder_one)
             text_encoder_two = _unwrap_model(text_encoder_two)
 
@@ -951,7 +956,7 @@ def train_lora(args):
 
         # Final inference
         # Make sure vae.dtype is consistent with the unet.dtype
-        if HYPERPARAMETERS.mixed_precision == "fp16":
+        if HYPERPARAMETERS.get('mixed_precision') == "fp16":
             vae.to(weight_dtype)
         # Load previous pipeline
         pipeline = diffusers.StableDiffusionXLPipeline.from_pretrained(
